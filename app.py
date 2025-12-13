@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file, render_template_string
 import yt_dlp
 import tempfile
 import os
+import re
 
 app = Flask(__name__)
 
@@ -142,7 +143,7 @@ HTML = '''
         </div>
         
         <div class="footer">
-            <p>İlknur Canberk Dans Okulu için özel yapıldı ❤️</p>
+            <p>İlknur Canberk için özel yapıldı ❤️</p>
         </div>
     </div>
 
@@ -240,12 +241,28 @@ def download():
         # Geçici dosya
         temp_dir = tempfile.gettempdir()
         
-        # YouTube indirme ayarları
+        # YouTube BOT ENGELİ ÇÖZÜMLÜ ayarlar
         ydl_opts = {
             'format': 'bestaudio/best',
             'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
             'quiet': True,
             'no_warnings': True,
+            # BOT ENGELİ ÇÖZÜMLERİ:
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs', 'webpage'],
+                }
+            },
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
@@ -259,10 +276,11 @@ def download():
             video_title = info.get('title', 'muzik')
             
             # Güvenli dosya adı
-            safe_title = "".join(c for c in video_title if c.isalnum() or c in (' ', '-', '_')).rstrip()
+            safe_title = re.sub(r'[^\w\s-]', '', video_title)
+            safe_title = safe_title.strip()[:40]
             if not safe_title:
                 safe_title = "muzik"
-            filename = safe_title[:40] + ".mp3"
+            filename = safe_title + ".mp3"
         
         return jsonify({
             'success': True,
@@ -271,7 +289,11 @@ def download():
         })
         
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
+        error_msg = str(e)
+        # Bot hatası özel mesaj
+        if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
+            error_msg = "YouTube bot engeli! Lütfen farklı bir video deneyin veya 5 dakika bekleyip tekrar deneyin."
+        return jsonify({'success': False, 'error': error_msg})
 
 @app.route('/file/<filename>')
 def get_file(filename):
@@ -279,7 +301,7 @@ def get_file(filename):
     
     # Dosyayı bul
     for file in os.listdir(temp_dir):
-        if file.endswith('.mp3') and filename.replace('.mp3', '') in file:
+        if file.endswith('.mp3') and filename.replace('.mp3', '')[:20] in file:
             return send_file(
                 os.path.join(temp_dir, file),
                 as_attachment=True,
@@ -288,7 +310,7 @@ def get_file(filename):
     
     return jsonify({'success': False, 'error': 'Dosya bulunamadı'}), 404
 
-# RENDER İÇİN GEREKLİ
+# Render için
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
