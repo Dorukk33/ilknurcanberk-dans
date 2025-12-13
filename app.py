@@ -3,6 +3,7 @@ import yt_dlp
 import tempfile
 import os
 import re
+import time
 
 app = Flask(__name__)
 
@@ -35,24 +36,21 @@ HTML = '''
         h1 {
             color: #333;
             text-align: center;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
             font-size: 28px;
         }
-        .input-group {
-            margin-bottom: 20px;
-        }
-        input[type="text"] {
+        input {
             width: 100%;
             padding: 15px;
             border: 2px solid #ddd;
             border-radius: 10px;
             font-size: 16px;
-            margin-bottom: 10px;
+            margin-bottom: 20px;
         }
         button {
             width: 100%;
-            padding: 16px;
-            background: linear-gradient(to right, #6a11cb, #2575fc);
+            padding: 18px;
+            background: linear-gradient(to right, #667eea, #764ba2);
             color: white;
             border: none;
             border-radius: 10px;
@@ -69,9 +67,9 @@ HTML = '''
             cursor: not-allowed;
         }
         .status {
-            padding: 12px;
-            border-radius: 8px;
-            margin: 15px 0;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
             text-align: center;
             display: none;
             font-weight: bold;
@@ -79,85 +77,24 @@ HTML = '''
         .success { background: #d4edda; color: #155724; }
         .error { background: #f8d7da; color: #721c24; }
         .loading { background: #fff3cd; color: #856404; }
-        .instructions {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 25px;
-        }
-        .step {
-            margin: 10px 0;
-            display: flex;
-            align-items: center;
-        }
-        .step-num {
-            background: #6a11cb;
-            color: white;
-            width: 28px;
-            height: 28px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-right: 12px;
-            font-weight: bold;
-        }
-        .footer {
-            text-align: center;
-            margin-top: 20px;
-            color: #666;
-            font-size: 14px;
-        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>🎵 Dans Okulu MP3 İndirici</h1>
-        <p style="text-align:center;color:#666;margin-bottom:30px;">YouTube'dan müzikleri tek tıkla indirin</p>
-        
-        <div class="input-group">
-            <input type="text" id="urlInput" placeholder="YouTube linkini buraya yapıştır...">
-        </div>
-        
+        <input type="text" id="urlInput" placeholder="YouTube linkini buraya yapıştır...">
         <button id="downloadBtn" onclick="downloadMusic()">MP3 İNDİR</button>
-        
         <div id="status" class="status"></div>
-        
-        <div class="instructions">
-            <div class="step">
-                <div class="step-num">1</div>
-                <span>YouTube'dan müzik linkini kopyala</span>
-            </div>
-            <div class="step">
-                <div class="step-num">2</div>
-                <span>Linki yukarıdaki kutuya yapıştır</span>
-            </div>
-            <div class="step">
-                <div class="step-num">3</div>
-                <span>"MP3 İNDİR" butonuna tıkla</span>
-            </div>
-            <div class="step">
-                <div class="step-num">4</div>
-                <span>Müzik otomatik indirilecek! 🎉</span>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>İlknur Canberk için özel yapıldı ❤️</p>
-        </div>
+        <p style="color: #666; font-size: 14px; text-align: center;">
+            İlknur Canberk için özel yapıldı ❤️
+        </p>
     </div>
 
     <script>
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = 'status ' + type;
-            status.style.display = 'block';
-        }
-        
         async function downloadMusic() {
             const url = document.getElementById('urlInput').value.trim();
             const btn = document.getElementById('downloadBtn');
+            const status = document.getElementById('status');
             
             if (!url) {
                 showStatus('⚠️ Lütfen YouTube linkini girin!', 'error');
@@ -171,7 +108,7 @@ HTML = '''
             
             btn.disabled = true;
             btn.textContent = '⏳ İndiriliyor...';
-            showStatus('Müzik indiriliyor, lütfen bekleyin...', 'loading');
+            showStatus('Müzik indiriliyor, lütfen bekleyin (1-2 dakika)...', 'loading');
             
             try {
                 const response = await fetch('/download', {
@@ -198,11 +135,6 @@ HTML = '''
                     // Input'u temizle
                     document.getElementById('urlInput').value = '';
                     
-                    // 3 saniye sonra mesajı kaldır
-                    setTimeout(() => {
-                        document.getElementById('status').style.display = 'none';
-                    }, 3000);
-                    
                 } else {
                     showStatus('❌ Hata: ' + result.error, 'error');
                 }
@@ -212,6 +144,13 @@ HTML = '''
                 btn.disabled = false;
                 btn.textContent = 'MP3 İNDİR';
             }
+        }
+        
+        function showStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+            status.style.display = 'block';
         }
         
         // Enter tuşu ile indirme
@@ -241,38 +180,74 @@ def download():
         # Geçici dosya
         temp_dir = tempfile.gettempdir()
         
-        # YouTube BOT ENGELİ ÇÖZÜMLÜ ayarlar
+        # YT-DLP AYARLARI (BOT ENGELİ ÇÖZÜMLÜ)
         ydl_opts = {
+            # Format seçimi
             'format': 'bestaudio/best',
             'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-            'quiet': True,
-            'no_warnings': True,
-            # BOT ENGELİ ÇÖZÜMLERİ:
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android', 'web'],
-                    'player_skip': ['configs', 'webpage'],
-                }
-            },
+            
+            # Bot engeli bypass
+            'quiet': False,
+            'no_warnings': False,
+            'ignoreerrors': True,
+            
+            # HTTP Headers (tarayıcı gibi davran)
             'http_headers': {
                 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'tr-TR,tr;q=0.9,en-US;q=0.8,en;q=0.7',
                 'Accept-Encoding': 'gzip, deflate',
-                'DNT': '1',
                 'Connection': 'keep-alive',
                 'Upgrade-Insecure-Requests': '1',
             },
+            
+            # Extractor ayarları
+            'extractor_args': {
+                'youtube': {
+                    'player_client': ['android', 'web'],
+                    'player_skip': ['configs', 'webpage', 'js'],
+                    'skip': ['hls', 'dash'],
+                }
+            },
+            
+            # Retry mekanizması
+            'retries': 10,
+            'fragment_retries': 10,
+            'skip_unavailable_fragments': True,
+            'keep_fragments': True,
+            
+            # Throttle (çok hızlı istek yapma)
+            'sleep_interval': 2,
+            'max_sleep_interval': 5,
+            
+            # Cookie kullan (opsiyonel)
+            'cookiefile': os.path.join(temp_dir, 'cookies.txt') if os.path.exists(os.path.join(temp_dir, 'cookies.txt')) else None,
+            
+            # Post-processor (MP3'e çevir)
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
             }],
+            
+            # Geçici çözümler
+            'force_ipv4': True,
+            'geo_bypass': True,
+            'geo_bypass_country': 'US',
+            'geo_bypass_ip_block': None,
         }
+        
+        print(f"İndirme başlıyor: {youtube_url}")
         
         # Müziği indir
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
+            # Önce info al
+            info = ydl.extract_info(youtube_url, download=False)
+            print(f"Video bulundu: {info.get('title', 'Bilinmeyen')}")
+            
+            # Sonra indir
+            ydl.download([youtube_url])
+            
             video_title = info.get('title', 'muzik')
             
             # Güvenli dosya adı
@@ -281,36 +256,69 @@ def download():
             if not safe_title:
                 safe_title = "muzik"
             filename = safe_title + ".mp3"
+            
+            # Dosyayı bul
+            for file in os.listdir(temp_dir):
+                if file.endswith('.mp3') and video_title[:30] in file:
+                    actual_file = file
+                    break
+            else:
+                # Yeni isimle dosyayı ara
+                for file in os.listdir(temp_dir):
+                    if file.endswith('.mp3'):
+                        actual_file = file
+                        # Dosyayı yeniden adlandır
+                        new_path = os.path.join(temp_dir, filename)
+                        old_path = os.path.join(temp_dir, file)
+                        if os.path.exists(old_path):
+                            os.rename(old_path, new_path)
+                        break
+                else:
+                    actual_file = filename
         
         return jsonify({
             'success': True,
             'filename': filename,
-            'title': video_title
+            'message': 'Müzik başarıyla indirildi!'
         })
         
     except Exception as e:
         error_msg = str(e)
-        # Bot hatası özel mesaj
-        if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-            error_msg = "YouTube bot engeli! Lütfen farklı bir video deneyin veya 5 dakika bekleyip tekrar deneyin."
+        print(f"HATA: {error_msg}")
+        
+        # Özel hata mesajları
+        if "Sign in to confirm" in error_msg:
+            error_msg = "YouTube bot engeli! 10 dakika bekleyip tekrar deneyin."
+        elif "Private video" in error_msg:
+            error_msg = "Bu video özel veya erişime kapalı."
+        elif " unavailable" in error_msg:
+            error_msg = "Video bulunamadı veya kaldırılmış."
+        elif "Too Many Requests" in error_msg:
+            error_msg = "Çok fazla istek gönderildi. Lütfen 30 dakika bekleyin."
+        
         return jsonify({'success': False, 'error': error_msg})
 
 @app.route('/file/<filename>')
 def get_file(filename):
-    temp_dir = tempfile.gettempdir()
-    
-    # Dosyayı bul
-    for file in os.listdir(temp_dir):
-        if file.endswith('.mp3') and filename.replace('.mp3', '')[:20] in file:
-            return send_file(
-                os.path.join(temp_dir, file),
-                as_attachment=True,
-                download_name=filename
-            )
-    
-    return jsonify({'success': False, 'error': 'Dosya bulunamadı'}), 404
+    try:
+        temp_dir = tempfile.gettempdir()
+        
+        # Dosyayı bul
+        for file in os.listdir(temp_dir):
+            if file.endswith('.mp3') and (filename.replace('.mp3', '') in file or file.replace('.mp3', '') in filename):
+                file_path = os.path.join(temp_dir, file)
+                return send_file(
+                    file_path,
+                    as_attachment=True,
+                    download_name=filename,
+                    mimetype='audio/mpeg'
+                )
+        
+        return jsonify({'success': False, 'error': 'Dosya bulunamadı'}), 404
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
 
-# Render için
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
