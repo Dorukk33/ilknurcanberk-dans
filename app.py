@@ -1,5 +1,5 @@
 from flask import Flask, render_template_string, request, jsonify
-import re
+import os  # BU SATIR ÇOK ÖNEMLİ!
 
 app = Flask(__name__)
 
@@ -384,7 +384,7 @@ HTML = '''
         
         <div class="footer">
             <p class="footer-text">
-                💃 <span class="highlight">İlknur Canberk </span> için özel olarak hazırlanmıştır ❤️<br>
+                💃 <span class="highlight">İlknur Canberk</span> için özel olarak hazırlanmıştır ❤️<br>
                 <small style="color: #94a3b8; font-size: 0.95rem; display: block; margin-top: 12px;">
                     Not: Bu araç YouTube bot engellerini aşmak için güvenilir üçüncü parti servislere yönlendirme yapar.
                 </small>
@@ -421,13 +421,13 @@ HTML = '''
         }
         
         function extractVideoId(url) {
-            // YouTube video ID'sini çıkaran fonksiyon
+            // YouTube video ID'sini çıkaran fonksiyon (DÜZELTİLMİŞ)
             const patterns = [
-                /youtu\.be\/([^#\&\?]{11})/,  // youtu.be/xxxxx
-                /\?v=([^#\&\?]{11})/,         // ?v=xxxxx
-                /&v=([^#\&\?]{11})/,          // &v=xxxxx
-                /embed\/([^#\&\?]{11})/,      // embed/xxxxx
-                /\/v\/([^#\&\?]{11})/         // /v/xxxxx
+                /youtu\.be\/([^#\&\?]{11})/,      // youtu.be/xxxxx
+                /\?v=([^#\&\?]{11})/,             // ?v=xxxxx
+                /&v=([^#\&\?]{11})/,              // &v=xxxxx
+                /embed\/([^#\&\?]{11})/,          // embed/xxxxx
+                /\/v\/([^#\&\?]{11})/             // /v/xxxxx
             ];
             
             for (const pattern of patterns) {
