@@ -1,7 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template_string
-import yt_dlp
-import tempfile
-import os
+from flask import Flask, render_template_string, request, jsonify
 import re
 
 app = Flask(__name__)
@@ -14,211 +11,496 @@ HTML = '''
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>🎵 Dans Okulu MP3 İndirici</title>
     <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
             min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 20px;
-            margin: 0;
         }
         .container {
             background: white;
-            border-radius: 20px;
-            padding: 40px;
+            border-radius: 24px;
+            padding: 50px;
             width: 100%;
-            max-width: 500px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 580px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
         }
         h1 {
-            color: #333;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 28px;
+            color: #1e293b;
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            background: linear-gradient(90deg, #6a11cb, #2575fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 800;
         }
-        input {
+        .subtitle {
+            color: #64748b;
+            font-size: 1.25rem;
+            font-weight: 400;
+        }
+        .input-section {
+            margin-bottom: 32px;
+        }
+        .input-label {
+            display: block;
+            margin-bottom: 12px;
+            color: #475569;
+            font-weight: 600;
+            font-size: 1.125rem;
+        }
+        .url-input {
             width: 100%;
-            padding: 15px;
-            border: 2px solid #ddd;
-            border-radius: 10px;
-            font-size: 16px;
-            margin-bottom: 20px;
-            box-sizing: border-box;
-        }
-        button {
-            width: 100%;
-            padding: 18px;
-            background: linear-gradient(to right, #667eea, #764ba2);
-            color: white;
-            border: none;
-            border-radius: 10px;
-            font-size: 18px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: transform 0.2s;
-        }
-        button:hover {
-            transform: translateY(-2px);
-        }
-        button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-        }
-        .status {
-            padding: 15px;
-            border-radius: 10px;
-            margin: 20px 0;
-            text-align: center;
-            display: none;
-            font-weight: bold;
-        }
-        .success { background: #d4edda; color: #155724; }
-        .error { background: #f8d7da; color: #721c24; }
-        .loading { background: #fff3cd; color: #856404; }
-        .instructions {
-            background: #f8f9fa;
             padding: 20px;
-            border-radius: 10px;
-            margin-top: 30px;
-            color: #666;
+            font-size: 1.125rem;
+            border: 2.5px solid #e2e8f0;
+            border-radius: 16px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            background: #f8fafc;
         }
-        .step {
-            margin: 10px 0;
+        .url-input:focus {
+            outline: none;
+            border-color: #6a11cb;
+            background: white;
+            box-shadow: 0 0 0 4px rgba(106, 17, 203, 0.15);
+            transform: translateY(-1px);
+        }
+        .url-input::placeholder {
+            color: #94a3b8;
+        }
+        .btn-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 32px;
+        }
+        .btn-primary, .btn-secondary {
+            flex: 1;
+            padding: 22px;
+            border: none;
+            border-radius: 16px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             display: flex;
             align-items: center;
+            justify-content: center;
+            gap: 12px;
+        }
+        .btn-primary {
+            background: linear-gradient(90deg, #6a11cb, #2575fc);
+            color: white;
+        }
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 12px 24px rgba(106, 17, 203, 0.3);
+        }
+        .btn-secondary {
+            background: #f1f5f9;
+            color: #475569;
+            border: 2px solid #e2e8f0;
+        }
+        .btn-secondary:hover {
+            background: #e2e8f0;
+            transform: translateY(-2px);
+        }
+        .btn-primary:disabled, .btn-secondary:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        .status-box {
+            padding: 20px;
+            border-radius: 16px;
+            margin-bottom: 32px;
+            text-align: center;
+            font-size: 1.125rem;
+            font-weight: 600;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .status-success { 
+            background: linear-gradient(90deg, #d1fae5, #a7f3d0);
+            color: #065f46;
+            border: 2px solid #10b981;
+        }
+        .status-error { 
+            background: linear-gradient(90deg, #fee2e2, #fecaca);
+            color: #991b1b;
+            border: 2px solid #ef4444;
+        }
+        .status-info { 
+            background: linear-gradient(90deg, #dbeafe, #bfdbfe);
+            color: #1e40af;
+            border: 2px solid #3b82f6;
+        }
+        
+        .sites-section {
+            background: linear-gradient(90deg, #f8fafc, #f1f5f9);
+            padding: 32px;
+            border-radius: 20px;
+            border-left: 6px solid #6a11cb;
+            margin-bottom: 40px;
+        }
+        .sites-section h3 {
+            color: #334155;
+            margin-bottom: 24px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .sites-section h3::before {
+            content: "📱";
+            font-size: 1.75rem;
+        }
+        .site-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+        .site-card {
+            background: white;
+            padding: 24px;
+            border-radius: 16px;
+            border: 2px solid #e2e8f0;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .site-card:hover {
+            border-color: #6a11cb;
+            transform: translateY(-3px) translateX(5px);
+            box-shadow: 0 12px 20px rgba(106, 17, 203, 0.15);
+        }
+        .site-icon {
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, #6a11cb, #2575fc);
+            border-radius: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+        .site-info {
+            flex: 1;
+        }
+        .site-name {
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 6px;
+            font-size: 1.125rem;
+        }
+        .site-desc {
+            color: #64748b;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        
+        .instructions {
+            background: linear-gradient(90deg, #fffbeb, #fef3c7);
+            padding: 32px;
+            border-radius: 20px;
+            border-left: 6px solid #f59e0b;
+            margin-bottom: 40px;
+        }
+        .instructions h3 {
+            color: #92400e;
+            margin-bottom: 20px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .instructions h3::before {
+            content: "📋";
+            font-size: 1.75rem;
+        }
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        .step {
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
         }
         .step-number {
-            background: #667eea;
+            background: linear-gradient(135deg, #f59e0b, #d97706);
             color: white;
-            width: 25px;
-            height: 25px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
             display: flex;
             align-items: center;
             justify-content: center;
-            margin-right: 10px;
-            font-weight: bold;
+            font-weight: 800;
+            font-size: 1.25rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
         }
+        .step-text {
+            color: #92400e;
+            font-size: 1.1rem;
+            line-height: 1.6;
+            padding-top: 8px;
+        }
+        .step-text strong {
+            color: #78350f;
+        }
+        
         .footer {
             text-align: center;
-            margin-top: 20px;
-            color: #666;
-            font-size: 14px;
+            padding-top: 32px;
+            border-top: 2px solid #e2e8f0;
+        }
+        .footer-text {
+            color: #64748b;
+            font-size: 1.125rem;
+            line-height: 1.6;
+        }
+        .highlight {
+            background: linear-gradient(90deg, #6a11cb, #2575fc);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            font-weight: 700;
             font-style: italic;
+        }
+        
+        /* Responsive */
+        @media (max-width: 640px) {
+            .container { padding: 30px; border-radius: 20px; }
+            h1 { font-size: 2rem; }
+            .btn-group { flex-direction: column; }
+            .site-grid { grid-template-columns: 1fr; }
+            .step { flex-direction: column; align-items: center; text-align: center; }
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🎵 Dans Okulu MP3 İndirici</h1>
-        <p style="text-align:center;color:#666;margin-bottom:30px;">YouTube'dan müzikleri tek tıkla indirin</p>
+        <div class="header">
+            <h1>🎵 Dans Okulu MP3 İndirici</h1>
+            <p class="subtitle">YouTube'dan müzikleri en kolay yoldan indirin</p>
+        </div>
         
-        <input type="text" id="urlInput" placeholder="YouTube linkini buraya yapıştır...">
-        <button id="downloadBtn" onclick="downloadMusic()">MP3 İNDİR</button>
+        <div class="input-section">
+            <label class="input-label">YouTube Linkiniz:</label>
+            <input type="text" id="youtubeUrl" class="url-input" 
+                   placeholder="https://www.youtube.com/watch?v=..." 
+                   autocomplete="off" value="https://www.youtube.com/watch?v=5qap5aO4i9A">
+        </div>
         
-        <div id="status" class="status"></div>
+        <div class="btn-group">
+            <button class="btn-primary" onclick="convertAndRedirect()" id="convertBtn">
+                <span>🚀</span> OTOMATİK MP3'E ÇEVİR
+            </button>
+            <button class="btn-secondary" onclick="showRecommendedSites()" id="sitesBtn">
+                <span>📱</span> SİTELERİ GÖSTER
+            </button>
+        </div>
+        
+        <div id="status" class="status-box"></div>
+        
+        <div class="sites-section" id="sitesSection" style="display: none;">
+            <h3>Önerilen MP3 İndirme Siteleri</h3>
+            <div class="site-grid">
+                <div class="site-card" onclick="openSite('https://ytmp3.nu')">
+                    <div class="site-icon">1</div>
+                    <div class="site-info">
+                        <div class="site-name">ytmp3.nu</div>
+                        <div class="site-desc">En hızlı ve güvenilir site, yüksek kalite MP3</div>
+                    </div>
+                </div>
+                <div class="site-card" onclick="openSite('https://y2mate.guru')">
+                    <div class="site-icon">2</div>
+                    <div class="site-info">
+                        <div class="site-name">y2mate.guru</div>
+                        <div class="site-desc">YouTube, Facebook, Twitter desteği</div>
+                    </div>
+                </div>
+                <div class="site-card" onclick="openSite('https://mp3-convert.org')">
+                    <div class="site-icon">3</div>
+                    <div class="site-info">
+                        <div class="site-name">mp3-convert.org</div>
+                        <div class="site-desc">Basit ve reklamsız arayüz</div>
+                    </div>
+                </div>
+                <div class="site-card" onclick="openSite('https://ytmp3.cc')">
+                    <div class="site-icon">4</div>
+                    <div class="site-info">
+                        <div class="site-name">ytmp3.cc</div>
+                        <div class="site-desc">Hızlı dönüşüm, mobil uyumlu</div>
+                    </div>
+                </div>
+            </div>
+        </div>
         
         <div class="instructions">
-            <div class="step">
-                <div class="step-number">1</div>
-                <span>YouTube'dan istediğiniz müziğin linkini kopyalayın</span>
-            </div>
-            <div class="step">
-                <div class="step-number">2</div>
-                <span>Linki yukarıdaki kutuya yapıştırın</span>
-            </div>
-            <div class="step">
-                <div class="step-number">3</div>
-                <span>"MP3 İNDİR" butonuna tıkla</span>
-            </div>
-            <div class="step">
-                <div class="step-number">4</div>
-                <span>Müzik otomatik olarak indirilecek! 🎉</span>
+            <h3>Nasıl Kullanılır?</h3>
+            <div class="step-list">
+                <div class="step">
+                    <div class="step-number">A</div>
+                    <div class="step-text">
+                        <strong>OTOMATİK ÇEVİRME:</strong> YouTube linkini yukarıya yapıştır, "OTOMATİK MP3'E ÇEVİR" butonuna tıkla. En iyi siteye yönlendirileceksin.
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">B</div>
+                    <div class="step-text">
+                        <strong>MANUEL SEÇİM:</strong> "SİTELERİ GÖSTER" butonuna tıkla, açılan sitelerden birini seç, YouTube linkini oraya yapıştır ve MP3'ü indir.
+                    </div>
+                </div>
+                <div class="step">
+                    <div class="step-number">C</div>
+                    <div class="step-text">
+                        <strong>TEKRAR İNDİR:</strong> Yeni bir müzik indirmek için sayfayı yenile veya "Sıradakini Dönüştür" butonuna tıkla.
+                    </div>
+                </div>
             </div>
         </div>
         
         <div class="footer">
-            <p>💃 İlknur Canberk Dans Okulu için özel olarak hazırlanmıştır ❤️</p>
+            <p class="footer-text">
+                💃 <span class="highlight">İlknur Canberk </span> için özel olarak hazırlanmıştır ❤️<br>
+                <small style="color: #94a3b8; font-size: 0.95rem; display: block; margin-top: 12px;">
+                    Not: Bu araç YouTube bot engellerini aşmak için güvenilir üçüncü parti servislere yönlendirme yapar.
+                </small>
+            </p>
         </div>
     </div>
 
     <script>
-        async function downloadMusic() {
-            const url = document.getElementById('urlInput').value.trim();
-            const btn = document.getElementById('downloadBtn');
-            const status = document.getElementById('status');
+        function showStatus(message, type) {
+            const statusBox = document.getElementById('status');
+            statusBox.innerHTML = `<span>${message}</span>`;
+            statusBox.className = `status-box status-${type}`;
+            statusBox.style.display = 'block';
             
-            // Kontrol
+            // Otomatik gizleme
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusBox.style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        function showRecommendedSites() {
+            const section = document.getElementById('sitesSection');
+            section.style.display = 'block';
+            showStatus('👇 Aşağıdaki sitelerden birini seçebilirsiniz. YouTube linkini oraya yapıştırın.', 'info');
+            // Sayfayı kaydır
+            section.scrollIntoView({ behavior: 'smooth' });
+        }
+        
+        function openSite(url) {
+            window.open(url, '_blank');
+            showStatus('✅ Site yeni sekmede açıldı! YouTube linkini oraya yapıştırın.', 'success');
+        }
+        
+        function extractVideoId(url) {
+            // YouTube video ID'sini çıkaran fonksiyon
+            const patterns = [
+                /youtu\.be\/([^#\&\?]{11})/,  // youtu.be/xxxxx
+                /\?v=([^#\&\?]{11})/,         // ?v=xxxxx
+                /&v=([^#\&\?]{11})/,          // &v=xxxxx
+                /embed\/([^#\&\?]{11})/,      // embed/xxxxx
+                /\/v\/([^#\&\?]{11})/         // /v/xxxxx
+            ];
+            
+            for (const pattern of patterns) {
+                const match = url.match(pattern);
+                if (match) {
+                    return match[1];
+                }
+            }
+            return null;
+        }
+        
+        async function convertAndRedirect() {
+            const url = document.getElementById('youtubeUrl').value.trim();
+            const btn = document.getElementById('convertBtn');
+            
+            // Kontroller
             if (!url) {
                 showStatus('⚠️ Lütfen YouTube linkini girin!', 'error');
                 return;
             }
             
+            // YouTube linki kontrolü
             if (!url.includes('youtube.com') && !url.includes('youtu.be')) {
                 showStatus('❌ Geçerli bir YouTube linki girin!', 'error');
                 return;
             }
             
-            btn.disabled = true;
-            btn.textContent = '⏳ İndiriliyor...';
-            showStatus('Müzik indiriliyor, lütfen bekleyin...', 'loading');
-            
-            try {
-                const response = await fetch('/download', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ url: url })
-                });
-                
-                const result = await response.json();
-                
-                if (result.success) {
-                    showStatus('✅ Müzik başarıyla indirildi!', 'success');
-                    
-                    // Dosyayı indir
-                    const downloadLink = document.createElement('a');
-                    downloadLink.href = '/file/' + encodeURIComponent(result.filename);
-                    downloadLink.download = result.filename;
-                    document.body.appendChild(downloadLink);
-                    downloadLink.click();
-                    document.body.removeChild(downloadLink);
-                    
-                    // Input'u temizle
-                    document.getElementById('urlInput').value = '';
-                    
-                    // 3 saniye sonra mesajı kaldır
-                    setTimeout(() => {
-                        status.style.display = 'none';
-                    }, 3000);
-                    
-                } else {
-                    showStatus('❌ Hata: ' + result.error, 'error');
-                }
-            } catch (error) {
-                showStatus('❌ İndirme sırasında hata oluştu', 'error');
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'MP3 İNDİR';
+            // Video ID çıkar
+            const videoId = extractVideoId(url);
+            if (!videoId || videoId.length !== 11) {
+                showStatus('❌ YouTube linkini kontrol edin!', 'error');
+                return;
             }
+            
+            btn.disabled = true;
+            btn.innerHTML = '<span>⏳</span> YÖNLENDİRİLİYOR...';
+            showStatus('En iyi MP3 sitesine yönlendiriliyor, lütfen bekleyin...', 'info');
+            
+            // 1.5 saniye bekle (kullanıcı deneyimi için)
+            setTimeout(() => {
+                // EN GÜVENİLİR SİTEYE YÖNLENDİR
+                const bestSite = `https://ytmp3.nu/@api/button/mp3/${videoId}`;
+                
+                // Yeni sekmede aç
+                window.open(bestSite, '_blank');
+                
+                // Başarı mesajı göster
+                showStatus('✅ <strong>ytmp3.nu</strong> sitesi açıldı! YouTube linkini oraya yapıştırın.', 'success');
+                
+                // Input'u temizle (opsiyonel)
+                // document.getElementById('youtubeUrl').value = '';
+                
+                // Butonu eski haline getir
+                setTimeout(() => {
+                    btn.disabled = false;
+                    btn.innerHTML = '<span>🚀</span> OTOMATİK MP3\'E ÇEVİR';
+                }, 1500);
+                
+            }, 1500);
         }
         
-        function showStatus(message, type) {
-            const status = document.getElementById('status');
-            status.textContent = message;
-            status.className = 'status ' + type;
-            status.style.display = 'block';
-        }
-        
-        // Enter tuşu ile indirme
-        document.getElementById('urlInput').addEventListener('keypress', function(event) {
+        // Enter tuşu ile çevirme
+        document.getElementById('youtubeUrl').addEventListener('keypress', function(event) {
             if (event.key === 'Enter') {
-                downloadMusic();
+                convertAndRedirect();
             }
         });
+        
+        // Sayfa yüklendiğinde örnek link göster
+        window.onload = function() {
+            // Örnek link zaten input'ta var
+            console.log('🎵 Dans Okulu MP3 İndirici hazır!');
+        };
     </script>
 </body>
 </html>
@@ -228,98 +510,37 @@ HTML = '''
 def home():
     return render_template_string(HTML)
 
-@app.route('/download', methods=['POST'])
-def download():
-    try:
-        data = request.get_json()
-        youtube_url = data.get('url')
-        
-        if not youtube_url:
-            return jsonify({'success': False, 'error': 'URL gerekli'})
-        
-        # Geçici dosya
-        temp_dir = tempfile.gettempdir()
-        
-        # YT-DLP AYARLARI (BASİT VE ÇALIŞIR)
-        ydl_opts = {
-            # Format 140 (m4a) - EN GARANTİLİ
-            'format': '140',
-            'outtmpl': os.path.join(temp_dir, '%(title)s.%(ext)s'),
-            
-            # Basit ayarlar
-            'quiet': True,
-            'no_warnings': True,
-            
-            # Post-processor: m4a -> mp3
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+@app.route('/api/recommended_sites')
+def recommended_sites():
+    """Önerilen MP3 sitelerini döndürür"""
+    sites = [
+        {
+            "name": "ytmp3.nu",
+            "url": "https://ytmp3.nu",
+            "description": "En hızlı ve güvenilir site",
+            "icon": "1"
+        },
+        {
+            "name": "y2mate.guru",
+            "url": "https://y2mate.guru",
+            "description": "YouTube, Facebook, Twitter desteği",
+            "icon": "2"
+        },
+        {
+            "name": "mp3-convert.org",
+            "url": "https://mp3-convert.org",
+            "description": "Basit ve reklamsız arayüz",
+            "icon": "3"
+        },
+        {
+            "name": "ytmp3.cc",
+            "url": "https://ytmp3.cc",
+            "description": "Hızlı dönüşüm, mobil uyumlu",
+            "icon": "4"
         }
-        
-        # Müziği indir
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(youtube_url, download=True)
-            video_title = info.get('title', 'muzik')
-            
-            # Güvenli dosya adı
-            safe_title = re.sub(r'[^\w\s-]', '', video_title)
-            safe_title = safe_title.strip()[:40]
-            if not safe_title:
-                safe_title = "muzik"
-            filename = safe_title + ".mp3"
-            
-            # İndirilen dosyayı bul ve MP3'e çevrilmiş halini ara
-            for file in os.listdir(temp_dir):
-                if file.endswith('.mp3') and (video_title[:30] in file or safe_title[:20] in file):
-                    actual_file = file
-                    break
-            else:
-                # Eğer MP3 bulunamazsa, m4a dosyasını ara
-                for file in os.listdir(temp_dir):
-                    if file.endswith('.m4a') and video_title[:30] in file:
-                        actual_file = file.replace('.m4a', '.mp3')
-                        break
-                else:
-                    actual_file = filename
-        
-        return jsonify({
-            'success': True,
-            'filename': actual_file,
-            'message': 'Müzik başarıyla indirildi!'
-        })
-        
-    except Exception as e:
-        error_msg = str(e)
-        
-        # Özel hata mesajları
-        if "Sign in to confirm" in error_msg or "bot" in error_msg.lower():
-            error_msg = "YouTube bot engeli! Lütfen 10 dakika bekleyip tekrar deneyin."
-        elif "Private video" in error_msg:
-            error_msg = "Bu video özel veya erişime kapalı."
-        elif " unavailable" in error_msg:
-            error_msg = "Video bulunamadı veya kaldırılmış."
-        
-        return jsonify({'success': False, 'error': error_msg})
+    ]
+    return jsonify({"sites": sites})
 
-@app.route('/file/<filename>')
-def get_file(filename):
-    temp_dir = tempfile.gettempdir()
-    
-    # Dosyayı bul
-    for file in os.listdir(temp_dir):
-        if file.endswith('.mp3') and (filename.replace('.mp3', '') in file or file.replace('.mp3', '') in filename):
-            return send_file(
-                os.path.join(temp_dir, file),
-                as_attachment=True,
-                download_name=filename,
-                mimetype='audio/mpeg'
-            )
-    
-    return jsonify({'success': False, 'error': 'Dosya bulunamadı'}), 404
-
-# Render için gerekli
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
     app.run(host='0.0.0.0', port=port, debug=False)
